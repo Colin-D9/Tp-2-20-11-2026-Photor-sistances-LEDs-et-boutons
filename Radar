@@ -1,0 +1,67 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <pigpiod_if2.h>
+
+#define LDR_A 4
+#define LDR_B 8
+#define LED_ROUGE 5
+#define DISTANCE 0.10      /* distance entre les LDR en metres */
+#define VITESSE_MAX 1.0    /* seuil en m/s */
+
+int main(void)
+{
+    int a, b;
+    int a_prec = PI_LOW, b_prec = PI_LOW;
+    int a_vue = 0;         /* 1 si A a ete cachee et qu'on attend B */
+    double t_a = 0, t_b = 0;
+    double vitesse;
+
+    int pi = pigpio_start(NULL, NULL);
+    if (pi < 0)
+    {
+        printf("Impossible de se connecter a pigpiod\n");
+        exit(1);
+    }
+    set_mode(pi, LDR_A, PI_INPUT);
+    set_pull_up_down(pi, LDR_A, PI_PUD_UP);
+    set_mode(pi, LDR_B, PI_INPUT);
+    set_pull_up_down(pi, LDR_B, PI_PUD_UP);
+    set_mode(pi, LED_ROUGE, PI_OUTPUT);
+
+    while (1)
+    {
+        a = gpio_read(pi, LDR_A);
+        b = gpio_read(pi, LDR_B);
+
+        if (a == PI_HIGH && a_prec == PI_LOW)      /* A vient d'etre cachee */
+        {
+            t_a = time_time();
+            a_vue = 1;
+        }
+
+        if (b == PI_HIGH && b_prec == PI_LOW && a_vue == 1)   /* B cachee apres A */
+        {
+            t_b = time_time();
+            if (t_b > t_a)
+            {
+                vitesse = DISTANCE / (t_b - t_a);
+                printf("Vitesse : %.2f m/s\n", vitesse);
+                if (vitesse > VITESSE_MAX)
+                {
+                    printf("Trop rapide !\n");
+                    gpio_write(pi, LED_ROUGE, PI_HIGH);
+                    time_sleep(0.5);
+                    gpio_write(pi, LED_ROUGE, PI_LOW);
+                }
+            }
+            a_vue = 0;
+        }
+
+        a_prec = a;
+        b_prec = b;
+        time_sleep(0.001);
+    }
+
+    pigpio_stop(pi);
+    return 0;
+}
