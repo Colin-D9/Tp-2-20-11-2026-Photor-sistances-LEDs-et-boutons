@@ -1,0 +1,101 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <pigpiod_if2.h>
+
+#define LDR_A 4
+#define LDR_B 8
+#define LED_ROUGE 5
+#define LED_JAUNE 12
+#define LED_VERTE 19
+#define BOUTON_A 20
+
+/* Allume la LED branchee sur la broche donnee pendant duree secondes. */
+void allumer_led(int pi, int broche, float duree)
+{
+    gpio_write(pi, broche, PI_HIGH);
+    time_sleep(duree);
+    gpio_write(pi, broche, PI_LOW);
+}
+
+int main(void)
+{
+    int a, b;
+    int a_prec = PI_LOW, b_prec = PI_LOW;
+    int bouton;
+    int bouton_prec = PI_HIGH;
+    int premier = 0;   /* 0 = rien, 1 = A cachee en premier, 2 = B cachee en premier */
+    int personnes = 0;
+    int leds[3] = {19, 12, 5};   /* verte, jaune, rouge : leds[1] vaut 12 (jaune) */
+    int i;
+
+    int pi = pigpio_start(NULL, NULL);
+    if (pi < 0)
+    {
+        printf("Impossible de se connecter a pigpiod\n");
+        exit(1);
+    }
+    set_mode(pi, LDR_A, PI_INPUT);
+    set_pull_up_down(pi, LDR_A, PI_PUD_UP);
+    set_mode(pi, LDR_B, PI_INPUT);
+    set_pull_up_down(pi, LDR_B, PI_PUD_UP);
+    set_mode(pi, BOUTON_A, PI_INPUT);
+    set_pull_up_down(pi, BOUTON_A, PI_PUD_UP);
+    set_mode(pi, LED_ROUGE, PI_OUTPUT);
+    set_mode(pi, LED_JAUNE, PI_OUTPUT);
+    set_mode(pi, LED_VERTE, PI_OUTPUT);
+
+    while (1)
+    {
+        a = gpio_read(pi, LDR_A);
+        b = gpio_read(pi, LDR_B);
+        bouton = gpio_read(pi, BOUTON_A);
+
+        if (a == PI_HIGH && a_prec == PI_LOW)      /* A vient d'etre cachee */
+        {
+            if (premier == 0)
+            {
+                premier = 1;
+            }
+            else if (premier == 2)                 /* SORTIE */
+            {
+                personnes = personnes - 1;
+                printf("Sortie ! Personnes : %d\n", personnes);
+                allumer_led(pi, LED_ROUGE, 0.5);
+                premier = 0;
+            }
+        }
+
+        if (b == PI_HIGH && b_prec == PI_LOW)      /* B vient d'etre cachee */
+        {
+            if (premier == 0)
+            {
+                premier = 2;
+            }
+            else if (premier == 1)                 /* ENTREE */
+            {
+                personnes = personnes + 1;
+                printf("Entree ! Personnes : %d\n", personnes);
+                for (i = 0; i < 3; i++)            /* Q14 : verte, jaune, rouge */
+                {
+                    allumer_led(pi, leds[i], 0.2);
+                }
+                premier = 0;
+            }
+        }
+
+        if (bouton == PI_LOW && bouton_prec == PI_HIGH)
+        {
+            personnes = 0;
+            premier = 0;
+            printf("Remise a zero. Personnes : %d\n", personnes);
+        }
+
+        a_prec = a;
+        b_prec = b;
+        bouton_prec = bouton;
+        time_sleep(0.005);
+    }
+
+    pigpio_stop(pi);
+    return 0;
+}
