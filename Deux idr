@@ -1,0 +1,29 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <pigpiod_if2.h>
+
+#define LDR_A 4
+#define LDR_B 8
+
+int main(void)
+{
+    int pi = pigpio_start(NULL, NULL); /* connexion au service pigpiod */
+    if (pi < 0)
+    {
+        printf("Impossible de se connecter a pigpiod\n");
+        exit(1);
+    }
+    set_mode(pi, LDR_A, PI_INPUT);
+    set_pull_up_down(pi, LDR_A, PI_PUD_UP);
+    set_mode(pi, LDR_B, PI_INPUT);
+    set_pull_up_down(pi, LDR_B, PI_PUD_UP);
+
+    while (1)
+    {
+        printf("A : %d   B : %d\n", gpio_read(pi, LDR_A), gpio_read(pi, LDR_B));
+        time_sleep(0.2);
+    }
+
+    pigpio_stop(pi);
+    return 0;
+}
