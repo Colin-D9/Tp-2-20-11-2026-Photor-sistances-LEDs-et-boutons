@@ -1,0 +1,50 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <pigpiod_if2.h>
+
+#define LDR 4
+#define BOUTON_A 20
+
+int main(void)
+{
+    int etat;
+    int etat_precedent = PI_LOW;
+    int bouton;
+    int bouton_precedent = PI_HIGH;   /* bouton relache = PI_HIGH */
+    int compteur = 0;
+
+    int pi = pigpio_start(NULL, NULL); /* connexion au service pigpiod */
+    if (pi < 0)
+    {
+        printf("Impossible de se connecter a pigpiod\n");
+        exit(1);
+    }
+    set_mode(pi, LDR, PI_INPUT);
+    set_pull_up_down(pi, LDR, PI_PUD_UP);
+    set_mode(pi, BOUTON_A, PI_INPUT);
+    set_pull_up_down(pi, BOUTON_A, PI_PUD_UP);
+
+    while (1)
+    {
+        etat = gpio_read(pi, LDR);
+        bouton = gpio_read(pi, BOUTON_A);
+
+        if (etat == PI_HIGH && etat_precedent == PI_LOW)   /* l'ombre arrive */
+        {
+            compteur = compteur + 1;
+            printf("Passages : %d\n", compteur);
+        }
+
+        if (bouton == PI_LOW && bouton_precedent == PI_HIGH) /* appui sur A */
+        {
+            compteur = 0;                                    /* Q5 : remise a zero */
+            printf("Compteur remis a 0\n");
+        }
+
+        etat_precedent = etat;
+        bouton_precedent = bouton;
+        time_sleep(0.02);
+    }
+
+    pigpio_stop(pi);
+    return 0;
