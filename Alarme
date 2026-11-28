@@ -1,0 +1,42 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <pigpiod_if2.h>
+
+#define LDR 4
+#define LED_ROUGE 5
+#define LED_VERTE 19
+
+int main(void)
+{
+    int pi = pigpio_start(NULL, NULL); /* connexion au service pigpiod */
+    if (pi < 0)
+    {
+        printf("Impossible de se connecter a pigpiod\n");
+        exit(1);
+    }
+    set_mode(pi, LDR, PI_INPUT);
+    set_pull_up_down(pi, LDR, PI_PUD_UP);
+    set_mode(pi, LED_ROUGE, PI_OUTPUT);
+    set_mode(pi, LED_VERTE, PI_OUTPUT);
+
+    while (1)
+    {
+        if (gpio_read(pi, LDR) == PI_HIGH)      /* noir : boite fermee */
+        {
+            gpio_write(pi, LED_VERTE, PI_HIGH);
+            gpio_write(pi, LED_ROUGE, PI_LOW);
+            time_sleep(0.1);
+        }
+        else                                    /* lumiere : boite ouverte */
+        {
+            gpio_write(pi, LED_VERTE, PI_LOW);
+            gpio_write(pi, LED_ROUGE, PI_HIGH); /* LED rouge allumee */
+            time_sleep(0.2);                    /* attendre 0,2 s */
+            gpio_write(pi, LED_ROUGE, PI_LOW);  /* LED rouge eteinte */
+            time_sleep(0.2);                    /* attendre 0,2 s */
+        }
+    }
+
+    pigpio_stop(pi);
+    return 0;
+}
